@@ -1,0 +1,69 @@
+name: luma
+x-api: &api
+  build:
+    context: ../backend
+  env_file:
+    - path: ../backend/.env
+      required: false
+  environment:
+    DATABASE_URL: postgresql+psycopg://luma:luma_local_only@db:5432/luma
+    REDIS_URL: redis://redis:6379/0
+  volumes:
+    - media:/app/var/media
+    - mail:/app/var/mail
+  restart: unless-stopped
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: luma
+      POSTGRES_PASSWORD: luma_local_only
+      POSTGRES_DB: luma
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U luma -d luma"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  api:
+    <<: *api
+    profiles: ["app"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  worker:
+    <<: *api
+    profiles: ["app"]
+    command: ["python", "-m", "app.workers.run"]
+    healthcheck:
+      disable: true
+    depends_on:
+      api:
+        condition: service_healthy
+volumes:
+  postgres:
+  redis:
+  media:
+  mail:
