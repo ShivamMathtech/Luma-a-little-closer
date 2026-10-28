@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.12",
+    "@electric-sql/pglite-socket": "0.2.15"
+  },
+  "name": "luma-postgres-compatibility-qa",
+  "version": "1.0.0",
+  "private": true
+}
